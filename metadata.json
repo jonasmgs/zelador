@@ -1,0 +1,7 @@
+{
+  "name": "Copy of ZeladorCheck",
+  "description": "Sistema SaaS para gestão de zeladoria em condomínios, com checklists diários, agendamentos e comprovação por fotos.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

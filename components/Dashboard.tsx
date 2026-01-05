@@ -15,7 +15,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onNavigate, selected
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
   
   const isManagement = currentUser.role === UserRole.SINDICO || currentUser.role === UserRole.GESTOR;
-  const isOperational = currentUser.role === UserRole.ZELADOR || currentUser.role === UserRole.LIMPEZA;
+  const isOperational = currentUser.role === UserRole.ZELADOR || currentUser.role === UserRole.LIMPEZA || currentUser.role === UserRole.PORTEIRO;
 
   useEffect(() => {
     const currentCondo = db.getCondos().find(c => c.id === selectedCondoId);
@@ -60,168 +60,110 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onNavigate, selected
   }, [filteredTasks, currentUser.id]);
 
   return (
-    <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight leading-none">
-            {greeting}, <span className="text-blue-600">{currentUser.name.split(' ')[0]}</span>! 👋
+          <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-none uppercase">
+            {greeting}, <span className="text-blue-600">{currentUser.name.split(' ')[0]}</span>
           </h2>
-          <div className="flex items-center gap-3 mt-2">
-            <p className="text-slate-500 font-bold flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              {activeCondo ? activeCondo.name : 'Selecione uma unidade'}
+          <div className="flex items-center gap-3 mt-1.5">
+            <p className="text-slate-500 font-bold text-xs flex items-center gap-2 uppercase tracking-widest">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+              {activeCondo ? activeCondo.name : 'Unidade Pendente'}
             </p>
-            <span className="text-slate-300">•</span>
-            <p className="text-slate-400 font-medium">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</p>
+            <span className="text-slate-300">|</span>
+            <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest">{new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</p>
           </div>
         </div>
         
         {isOperational && notifPermission !== 'granted' && (
           <button 
             onClick={handleRequestPermission}
-            className="flex items-center gap-2 bg-amber-50 text-amber-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-100 hover:bg-amber-100 transition-all"
+            className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-            Ativar Alertas Push
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+            Ativar Notificações
           </button>
         )}
       </header>
 
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {isManagement ? (
-          <>
-            <StatCard label="Pendências" val={stats.pending} icon="Tasks" color="blue" />
-            <StatCard label="Em Execução" val={stats.inProgress} icon="Schedule" color="amber" />
-            <StatCard label="Orçamentos" val={stats.pendingBudgets} icon="Dashboard" color="purple" />
-            <StatCard label="Concluídas" val={stats.completedToday} icon="History" color="emerald" />
-          </>
-        ) : (
-          <>
-            <StatCard label="Minhas Tarefas" val={stats.myTasksToday} icon="Tasks" color="blue" />
-            <StatCard label="Em Curso" val={stats.inProgress} icon="Schedule" color="amber" />
-            <StatCard label="Feito Hoje" val={stats.completedToday} icon="History" color="emerald" />
-            <div className="bg-slate-900 p-5 md:p-8 rounded-[32px] flex flex-col justify-center border border-slate-800">
-               <p className="text-white/50 text-[10px] font-black uppercase tracking-widest">Alertas</p>
-               <p className="text-white font-black text-lg md:text-xl mt-1 flex items-center gap-2">
-                 {notifPermission === 'granted' ? '✅ Ativos' : '⚠️ Inativos'}
-               </p>
-            </div>
-          </>
-        )}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Aguardando" val={stats.pending} icon="Tasks" color="blue" onClick={() => onNavigate('tasks')} />
+        <StatCard label="Execução" val={stats.inProgress} icon="Schedule" color="amber" onClick={() => onNavigate('tasks')} />
+        <StatCard label="Orçamentos" val={stats.pendingBudgets} icon="Dashboard" color="purple" onClick={() => onNavigate('procurement')} />
+        <StatCard label="Concluídas" val={stats.completedToday} icon="History" color="emerald" onClick={() => onNavigate('reports')} />
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
           {isOperational && nextTask && (
-            <div className="bg-blue-600 rounded-[40px] p-8 text-white shadow-2xl shadow-blue-500/20 group relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                 <Icons.Tasks />
-               </div>
-               <p className="text-blue-100 text-[10px] font-black uppercase tracking-[0.2em] mb-4">Ação Prioritária</p>
-               <h3 className="text-2xl md:text-3xl font-black mb-2 leading-tight">Sua próxima tarefa é: <br/> {nextTask.title}</h3>
-               <p className="text-blue-100/80 font-medium mb-6 text-sm max-w-md">{nextTask.description}</p>
+            <div className="bg-slate-900 rounded-lg p-6 text-white shadow-xl relative overflow-hidden border-l-4 border-blue-500">
+               <p className="text-blue-400 text-[9px] font-black uppercase tracking-widest mb-3">Prioridade do Dia</p>
+               <h3 className="text-xl font-black mb-1 leading-tight uppercase tracking-tight">{nextTask.title}</h3>
+               <p className="text-slate-400 font-medium mb-6 text-xs leading-relaxed">{nextTask.description}</p>
                <button 
                 onClick={() => onNavigate('tasks')}
-                className="bg-white text-blue-600 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                className="bg-blue-600 text-white px-6 py-2.5 rounded text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95"
                >
-                 Abrir Checklist Agora
+                 Abrir Checklist
                </button>
             </div>
           )}
 
-          {isManagement && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <button onClick={() => onNavigate('procurement')} className="bg-white p-6 rounded-[32px] border border-slate-200 flex items-center gap-5 hover:border-blue-500 transition-all text-left">
-                  <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                  </div>
-                  <div>
-                    <h4 className="font-black text-slate-900 text-lg">Suprimentos</h4>
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">{stats.pendingBudgets} orçamentos esperando</p>
-                  </div>
-               </button>
-               <button onClick={() => onNavigate('history')} className="bg-white p-6 rounded-[32px] border border-slate-200 flex items-center gap-5 hover:border-blue-500 transition-all text-left">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                    <Icons.History />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-slate-900 text-lg">Auditoria</h4>
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Verificar logs de hoje</p>
-                  </div>
-               </button>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Cronograma de Hoje</h3>
+              <button onClick={() => onNavigate('tasks')} className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:underline">Ver tudo</button>
             </div>
-          )}
-
-          <div className="space-y-4 pt-4">
-            <div className="flex items-center justify-between px-2">
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">Tarefas do Dia</h3>
-              <button onClick={() => onNavigate('tasks')} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Ver todas</button>
-            </div>
-            <div className="space-y-3">
-              {filteredTasks.filter(t => t.status !== TaskStatus.COMPLETED).slice(0, 4).map(task => (
-                <div key={task.id} className="bg-white p-6 rounded-[28px] border border-slate-200 flex items-center gap-4 hover:shadow-lg transition-all">
-                  <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+            <div className="grid grid-cols-1 gap-2">
+              {filteredTasks.filter(t => t.status !== TaskStatus.COMPLETED).slice(0, 5).map(task => (
+                <div key={task.id} className="bg-white p-4 rounded border border-slate-200 flex items-center gap-4 hover:border-slate-400 transition-all cursor-pointer group" onClick={() => onNavigate('tasks')}>
+                  <div className="w-9 h-9 rounded bg-slate-50 flex items-center justify-center text-slate-400 shrink-0 border border-slate-100 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
                     <Icons.Tasks />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-slate-900 text-sm truncate">{task.title}</h4>
-                    <div className="flex items-center gap-3 mt-1">
-                       <span className="text-[9px] font-black text-blue-600 uppercase bg-blue-50 px-2 py-0.5 rounded-md">{task.category}</span>
-                       <span className="text-[9px] font-black text-slate-400 uppercase">{task.assignedUserName.split(' ')[0]}</span>
-                    </div>
+                    <h4 className="font-bold text-slate-800 text-xs truncate uppercase tracking-tight group-hover:text-blue-600 transition-colors">{task.title}</h4>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mt-0.5">{task.assignedUserName}</p>
                   </div>
-                  <div className="text-slate-300">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
+                  <div className="text-[9px] font-black uppercase bg-blue-50 text-blue-600 px-2 py-1 rounded">
+                    {task.category}
                   </div>
                 </div>
               ))}
-              {filteredTasks.length === 0 && (
-                <div className="p-10 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[32px] text-center">
-                  <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Nenhuma tarefa ativa no momento.</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-6">
-          <section className="bg-slate-900 p-8 rounded-[40px] shadow-xl text-white border border-slate-800">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-black tracking-tight">Mural Interno</h3>
-              <button onClick={() => onNavigate('messages')} className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-all">
-                <Icons.Messages />
-              </button>
-            </div>
-            <div className="space-y-6">
-              <div className="relative pl-6 border-l-2 border-blue-500">
-                <p className="text-sm font-medium text-slate-300 leading-relaxed italic">"Atenção equipe: Manutenção programada da bomba d'água amanhã às 08h."</p>
-                <p className="text-[10px] font-black uppercase text-blue-400 mt-2">Sindico • Hoje</p>
+        <div className="lg:col-span-4 space-y-4">
+          <section className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-900 mb-4 border-b pb-2">Mural Interno</h3>
+            <div className="space-y-4">
+              <div className="border-l-2 border-blue-500 pl-4 py-1">
+                <p className="text-xs font-bold text-slate-700 italic">"Manutenção das bombas d'água agendada."</p>
+                <p className="text-[9px] font-black uppercase text-slate-400 mt-1">Admin • Hoje</p>
               </div>
-              <div className="relative pl-6 border-l-2 border-slate-700">
-                <p className="text-sm font-medium text-slate-400 leading-relaxed italic">"Limpeza do salão de festas concluída com sucesso."</p>
-                <p className="text-[10px] font-black uppercase text-slate-500 mt-2">Equipe Limpeza • Ontem</p>
+              <div className="border-l-2 border-slate-200 pl-4 py-1">
+                <p className="text-xs font-bold text-slate-500 italic">"Limpeza do hall social concluída."</p>
+                <p className="text-[9px] font-black uppercase text-slate-400 mt-1">Operacional • Ontem</p>
               </div>
             </div>
             <button 
               onClick={() => onNavigate('messages')}
-              className="w-full mt-8 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+              className="w-full mt-6 py-3 bg-slate-50 border border-slate-200 text-slate-600 rounded text-[9px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
             >
-              Ver Todas as Mensagens
+              Mural Completo
             </button>
           </section>
 
-          <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
-             <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Clima e Operação</h4>
-             <div className="flex items-center justify-between">
+          <div className="bg-slate-900 text-white p-6 rounded-lg shadow-sm border-t-2 border-blue-500">
+             <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-2">Clima Operacional</p>
+             <div className="flex items-end justify-between">
                 <div>
-                   <p className="text-3xl font-black text-slate-900">24°C</p>
-                   <p className="text-xs text-slate-500 font-bold">Céu Limpo</p>
+                   <p className="text-3xl font-black leading-none tracking-tighter">24°C</p>
+                   <p className="text-[10px] text-blue-400 font-black uppercase mt-1">Céu Limpo</p>
                 </div>
-                <div className="bg-amber-50 text-amber-600 p-3 rounded-2xl">
-                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 9h-1m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                </div>
+                <div className="text-blue-500 opacity-50"><Icons.Schedule /></div>
              </div>
-             <p className="text-[10px] text-slate-400 font-medium mt-4 leading-relaxed">Condições ideais para manutenção externa e pintura hoje.</p>
           </div>
         </div>
       </div>
@@ -229,24 +171,27 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onNavigate, selected
   );
 };
 
-const StatCard = ({ label, val, color, icon }: { label: string, val: number, color: string, icon: keyof typeof Icons }) => {
+const StatCard = ({ label, val, color, icon, onClick }: { label: string, val: number, color: string, icon: keyof typeof Icons, onClick?: () => void }) => {
   const IconComp = Icons[icon];
   
   const colors = {
-    blue: 'text-blue-600 bg-blue-50 border-blue-100',
-    amber: 'text-amber-600 bg-amber-50 border-amber-100',
-    purple: 'text-purple-600 bg-purple-50 border-purple-100',
-    emerald: 'text-emerald-600 bg-emerald-50 border-emerald-100',
-  }[color as 'blue' | 'amber' | 'purple' | 'emerald'] || 'text-slate-600 bg-slate-50 border-slate-100';
+    blue: 'text-blue-600 border-blue-200',
+    amber: 'text-amber-600 border-amber-200',
+    purple: 'text-purple-600 border-purple-200',
+    emerald: 'text-emerald-600 border-emerald-200',
+  }[color as 'blue' | 'amber' | 'purple' | 'emerald'] || 'text-slate-600 border-slate-200';
 
   return (
-    <div className="bg-white p-6 md:p-8 rounded-[32px] border border-slate-200 shadow-sm group hover:border-blue-300 transition-all">
-      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${colors.split(' ')[1]} ${colors.split(' ')[0]}`}>
+    <button 
+      onClick={onClick}
+      className="bg-white p-5 rounded-lg border border-slate-200 group hover:border-slate-400 transition-all text-left w-full hover:scale-[1.02] active:scale-95 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+    >
+      <div className={`w-8 h-8 rounded mb-3 flex items-center justify-center transition-transform group-hover:scale-110 ${colors.split(' ')[0]}`}>
         <IconComp />
       </div>
-      <p className="text-3xl md:text-5xl font-black text-slate-900 tracking-tighter leading-none">{val}</p>
-      <p className="text-[9px] md:text-[10px] text-slate-400 font-black uppercase tracking-[0.15em] mt-2 whitespace-nowrap">{label}</p>
-    </div>
+      <p className="text-3xl font-black text-slate-900 tracking-tighter leading-none">{val}</p>
+      <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-2">{label}</p>
+    </button>
   );
 };
 

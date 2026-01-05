@@ -17,7 +17,8 @@ export enum UserRole {
   SINDICO = 'SINDICO',
   GESTOR = 'GESTOR',
   ZELADOR = 'ZELADOR',
-  LIMPEZA = 'LIMPEZA'
+  LIMPEZA = 'LIMPEZA',
+  PORTEIRO = 'PORTEIRO'
 }
 
 export enum IncidentStatus {
@@ -29,6 +30,7 @@ export interface User {
   id: string;
   name: string;
   role: UserRole;
+  jobTitle?: string; // Título da função operacional personalizada
   email: string;
   password?: string;
   avatar?: string;
@@ -57,6 +59,7 @@ export interface Task {
   photos?: string[];
   category: string;
   condoId?: string;
+  completionObservation?: string;
 }
 
 export interface Incident {

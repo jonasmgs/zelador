@@ -11,16 +11,18 @@ const DB_KEYS = {
   DOCUMENTS: 'cc_db_documents',
   BUDGETS: 'cc_db_budgets',
   CATEGORIES: 'cc_db_categories',
-  INCIDENTS: 'cc_db_incidents'
+  INCIDENTS: 'cc_db_incidents',
+  USER_FUNCTIONS: 'cc_db_user_functions'
 };
 
 const initializeDB = () => {
   if (!localStorage.getItem(DB_KEYS.USERS)) {
     const defaultUsers: User[] = [
-      { id: 'u1', name: 'Ricardo Alencar', role: UserRole.SINDICO, email: '', password: '123', active: true },
-      { id: 'u2', name: 'Mariana Costa', role: UserRole.GESTOR, email: '', password: '123', active: true, condoId: 'c1' },
-      { id: 'u3', name: 'João Silva', role: UserRole.ZELADOR, email: '', password: '123', active: true, condoId: 'c1' },
-      { id: 'u4', name: 'Marcos Souza', role: UserRole.LIMPEZA, email: '', password: '123', active: true, condoId: 'c1' }
+      { id: 'u1', name: 'Ricardo Alencar', role: UserRole.SINDICO, jobTitle: 'Síndico Geral', email: '', password: '123', active: true },
+      { id: 'u2', name: 'Mariana Costa', role: UserRole.GESTOR, jobTitle: 'Gestora Predial', email: '', password: '123', active: true, condoId: 'c1' },
+      { id: 'u3', name: 'João Silva', role: UserRole.ZELADOR, jobTitle: 'Zelador', email: '', password: '123', active: true, condoId: 'c1' },
+      { id: 'u4', name: 'Marcos Souza', role: UserRole.LIMPEZA, jobTitle: 'Aux. Limpeza', email: '', password: '123', active: true, condoId: 'c1' },
+      { id: 'u5', name: 'Carlos Porteiro', role: UserRole.PORTEIRO, jobTitle: 'Porteiro Noturno', email: '', password: '123', active: true, condoId: 'c1' }
     ];
     localStorage.setItem(DB_KEYS.USERS, JSON.stringify(defaultUsers));
   }
@@ -31,6 +33,16 @@ const initializeDB = () => {
   }
   if (!localStorage.getItem(DB_KEYS.CATEGORIES)) {
     localStorage.setItem(DB_KEYS.CATEGORIES, JSON.stringify(["Manutenção", "Limpeza", "Piscina", "Jardinagem", "Segurança", "Outros"]));
+  }
+  if (!localStorage.getItem(DB_KEYS.USER_FUNCTIONS)) {
+    localStorage.setItem(DB_KEYS.USER_FUNCTIONS, JSON.stringify([
+      { name: "Zelador", baseRole: UserRole.ZELADOR },
+      { name: "Limpeza", baseRole: UserRole.LIMPEZA },
+      { name: "Porteiro", baseRole: UserRole.PORTEIRO },
+      { name: "Segurança", baseRole: UserRole.ZELADOR },
+      { name: "Jardineiro", baseRole: UserRole.ZELADOR },
+      { name: "Gestor", baseRole: UserRole.GESTOR }
+    ]));
   }
   if (!localStorage.getItem(DB_KEYS.TASKS)) localStorage.setItem(DB_KEYS.TASKS, JSON.stringify([]));
   if (!localStorage.getItem(DB_KEYS.MESSAGES)) localStorage.setItem(DB_KEYS.MESSAGES, JSON.stringify([]));
@@ -52,6 +64,7 @@ export const db = {
   getVendors: (): Vendor[] => JSON.parse(localStorage.getItem(DB_KEYS.VENDORS) || '[]'),
   getCategories: (): string[] => JSON.parse(localStorage.getItem(DB_KEYS.CATEGORIES) || '[]'),
   getIncidents: (): Incident[] => JSON.parse(localStorage.getItem(DB_KEYS.INCIDENTS) || '[]'),
+  getUserFunctions: (): { name: string, baseRole: UserRole }[] => JSON.parse(localStorage.getItem(DB_KEYS.USER_FUNCTIONS) || '[]'),
   
   getVendorsByCondo: (condoId: string): Vendor[] => db.getVendors().filter(v => v.condoId === condoId),
   getUsersByCondo: (condoId: string): User[] => db.getUsers().filter(u => u.condoId === condoId),
@@ -66,6 +79,17 @@ export const db = {
     const index = users.findIndex(u => u.id === user.id);
     if (index >= 0) users[index] = user; else users.push(user);
     localStorage.setItem(DB_KEYS.USERS, JSON.stringify(users));
+  },
+  saveUserFunction: (func: { name: string, baseRole: UserRole }) => {
+    const funcs = db.getUserFunctions();
+    if (!funcs.find(f => f.name === func.name)) {
+      funcs.push(func);
+      localStorage.setItem(DB_KEYS.USER_FUNCTIONS, JSON.stringify(funcs));
+    }
+  },
+  deleteUserFunction: (name: string) => {
+    const funcs = db.getUserFunctions().filter(f => f.name !== name);
+    localStorage.setItem(DB_KEYS.USER_FUNCTIONS, JSON.stringify(funcs));
   },
   saveTask: (task: Task) => {
     const tasks = db.getTasks();
@@ -118,6 +142,31 @@ export const db = {
       cats.push(name);
       localStorage.setItem(DB_KEYS.CATEGORIES, JSON.stringify(cats));
     }
+  },
+  updateCategory: (oldName: string, newName: string) => {
+    if (!newName || oldName === newName) return;
+    
+    // 1. Update Categories list
+    let cats = db.getCategories();
+    const idx = cats.indexOf(oldName);
+    if (idx !== -1) {
+      cats[idx] = newName;
+      localStorage.setItem(DB_KEYS.CATEGORIES, JSON.stringify(cats));
+    }
+
+    // 2. Update Vendors using this category
+    const vendors = db.getVendors();
+    vendors.forEach(v => {
+      if (v.category === oldName) v.category = newName;
+    });
+    localStorage.setItem(DB_KEYS.VENDORS, JSON.stringify(vendors));
+
+    // 3. Update Tasks using this category
+    const tasks = db.getTasks();
+    tasks.forEach(t => {
+      if (t.category === oldName) t.category = newName;
+    });
+    localStorage.setItem(DB_KEYS.TASKS, JSON.stringify(tasks));
   },
   deleteCategory: (name: string) => {
     const cats = db.getCategories().filter(c => c !== name);

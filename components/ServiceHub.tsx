@@ -25,6 +25,7 @@ const ServiceHub: React.FC<ServiceHubProps> = ({ selectedCondoId, notify, curren
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [editingCategory, setEditingCategory] = useState<{ old: string, new: string } | null>(null);
   
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -134,22 +135,33 @@ const ServiceHub: React.FC<ServiceHubProps> = ({ selectedCondoId, notify, curren
     notify(isUpdate ? 'Cotação atualizada!' : 'Cotação registrada!');
   };
 
-  const handleBudgetFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBudgetFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploading(true);
     const reader = new FileReader();
     reader.onloadend = () => {
-      const newDoc: Attachment = {
+      const newAttachment: Attachment = {
         id: Math.random().toString(36).substr(2, 9),
         name: file.name,
         url: reader.result as string,
         uploadDate: new Date().toISOString()
       };
-      setBudgetForm(prev => ({ ...prev, documents: [...prev.documents, newDoc] }));
+      setBudgetForm(prev => ({
+        ...prev,
+        documents: [...prev.documents, newAttachment]
+      }));
       setIsUploading(false);
+      e.target.value = ''; // Reset input
     };
     reader.readAsDataURL(file);
+  };
+
+  const removeBudgetAttachment = (id: string) => {
+    setBudgetForm(prev => ({
+      ...prev,
+      documents: prev.documents.filter(doc => doc.id !== id)
+    }));
   };
 
   const handleAddBudgetItem = () => {
@@ -199,6 +211,14 @@ const ServiceHub: React.FC<ServiceHubProps> = ({ selectedCondoId, notify, curren
     notify('Especialidade adicionada!');
   };
 
+  const handleUpdateCategory = () => {
+    if (!editingCategory || !editingCategory.new.trim()) return;
+    db.updateCategory(editingCategory.old, editingCategory.new.trim());
+    refreshData();
+    setEditingCategory(null);
+    notify('Especialidade atualizada em todo o sistema!');
+  };
+
   const handleDeleteCategory = (cat: string) => {
     if (window.confirm(`Excluir a especialidade "${cat}"?`)) {
       db.deleteCategory(cat);
@@ -208,29 +228,29 @@ const ServiceHub: React.FC<ServiceHubProps> = ({ selectedCondoId, notify, curren
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Central de Suprimentos</h2>
+          <div className="flex items-center gap-3 mb-1">
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Suprimentos & Parceiros</h2>
             {activeCondo && (
-              <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100">
+              <span className="bg-white text-slate-500 px-3 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest border border-slate-200">
                 {activeCondo.name}
               </span>
             )}
           </div>
-          <p className="text-slate-500 font-medium">Controle de parceiros, orçamentos e auditoria.</p>
+          <p className="text-slate-500 font-medium text-sm">Controle financeiro e operacional de prestadores.</p>
         </div>
-        <div className="flex bg-slate-100 p-1.5 rounded-2xl shrink-0 overflow-x-auto scrollbar-hide">
+        <div className="flex bg-slate-200 p-1 rounded-md shrink-0 overflow-x-auto scrollbar-hide">
           {[
-            { id: 'vendors', label: 'Fornecedores' },
-            { id: 'budgets', label: 'Cotações' },
-            { id: 'history', label: 'Histórico' }
+            { id: 'vendors', label: 'Empresas' },
+            { id: 'budgets', label: 'Orçamentos' },
+            { id: 'history', label: 'Audit Log' }
           ].map(tab => (
             <button 
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id as any)}
-              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeSubTab === tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`px-5 py-2 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeSubTab === tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               {tab.label}
             </button>
@@ -239,44 +259,51 @@ const ServiceHub: React.FC<ServiceHubProps> = ({ selectedCondoId, notify, curren
       </header>
 
       {activeSubTab === 'vendors' && (
-        <div className="space-y-6 animate-in slide-in-from-left-4 duration-500">
+        <div className="space-y-4 animate-in slide-in-from-left-4 duration-500">
            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">Parceiros de Negócio</h3>
-              {canManage && (
-                <button onClick={() => { setEditingVendor(null); setVendorForm({ name: '', taxId: '', phone: '', category: categories[0] || 'Manutenção', documents: [] }); setShowVendorModal(true); }} className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all">
-                   + Adicionar Empresa
-                </button>
-              )}
+              <h3 className="text-lg font-black text-slate-800">Fornecedores Homologados</h3>
+              <div className="flex gap-2">
+                {canManage && (
+                  <button onClick={() => setShowCategoryManager(true)} className="bg-white border border-slate-300 text-slate-600 px-4 py-2.5 rounded-md text-[10px] font-black uppercase tracking-widest hover:border-blue-500 hover:text-blue-600 transition-all">
+                    Especialidades
+                  </button>
+                )}
+                {canManage && (
+                  <button onClick={() => { setEditingVendor(null); setVendorForm({ name: '', taxId: '', phone: '', category: categories[0] || 'Manutenção', documents: [] }); setShowVendorModal(true); }} className="bg-slate-900 text-white px-5 py-2.5 rounded-md text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                    + Novo Fornecedor
+                  </button>
+                )}
+              </div>
            </div>
            
-           <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-sm">
-             <table className="w-full text-left border-collapse">
-               <thead className="bg-slate-50 border-b border-slate-100">
+           <div className="bg-white rounded-md border border-slate-200 overflow-x-auto scrollbar-hide">
+             <table className="w-full text-left border-collapse min-w-[600px] md:min-w-full">
+               <thead className="bg-slate-50 border-b border-slate-200">
                  <tr>
-                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Empresa</th>
-                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Especialidade</th>
-                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contato</th>
-                   {canManage && <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>}
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Empresa</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Especialidade</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contato</th>
+                   {canManage && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>}
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-100">
                  {vendors.map(v => (
                    <tr key={v.id} className="hover:bg-slate-50/50 transition-colors">
-                     <td className="px-8 py-5">
+                     <td className="px-6 py-4">
                        <p className="font-bold text-slate-900">{v.name}</p>
-                       <p className="text-[9px] text-slate-400 font-black uppercase">Ref: {v.taxId}</p>
+                       <p className="text-[9px] text-slate-400 font-black uppercase">{v.taxId}</p>
                      </td>
-                     <td className="px-8 py-5"><span className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-3 py-1 rounded-lg">{v.category}</span></td>
-                     <td className="px-8 py-5 text-sm font-medium text-slate-600">{v.phone}</td>
+                     <td className="px-6 py-4"><span className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-3 py-1 rounded-sm">{v.category}</span></td>
+                     <td className="px-6 py-4 text-xs font-semibold text-slate-600">{v.phone}</td>
                      {canManage && (
-                       <td className="px-8 py-5 text-right">
-                         <button onClick={() => { setEditingVendor(v); setVendorForm({ name: v.name, taxId: v.taxId, phone: v.phone, category: v.category, documents: v.documents || [] }); setShowVendorModal(true); }} className="p-2 text-slate-400 hover:text-blue-600 transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
+                       <td className="px-6 py-4 text-right">
+                         <button onClick={() => { setEditingVendor(v); setVendorForm({ name: v.name, taxId: v.taxId, phone: v.phone, category: v.category, documents: v.documents || [] }); setShowVendorModal(true); }} className="p-2 text-slate-400 hover:text-blue-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
                        </td>
                      )}
                    </tr>
                  ))}
                  {vendors.length === 0 && (
-                   <tr><td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">Nenhum fornecedor cadastrado.</td></tr>
+                   <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Sem fornecedores cadastrados.</td></tr>
                  )}
                </tbody>
              </table>
@@ -285,263 +312,258 @@ const ServiceHub: React.FC<ServiceHubProps> = ({ selectedCondoId, notify, curren
       )}
 
       {activeSubTab === 'budgets' && (
-        <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
+        <div className="space-y-4 animate-in slide-in-from-right-4 duration-500">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <h3 className="text-xl font-black text-slate-900 tracking-tight">Cotações e Orçamentos</h3>
-            <div className="flex gap-3">
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)} className="bg-white border-2 border-slate-100 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 outline-none">
-                <option value="ALL">Todos os Status</option>
+            <h3 className="text-lg font-black text-slate-800">Processos de Cotação</h3>
+            <div className="flex gap-2">
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)} className="bg-white border border-slate-200 rounded-md px-4 py-2 text-[10px] font-black uppercase text-slate-600 outline-none">
+                <option value="ALL">Status: Todos</option>
                 <option value="PENDING">Pendentes</option>
                 <option value="APPROVED">Aprovados</option>
                 <option value="REJECTED">Rejeitados</option>
               </select>
               {canManage && (
-                <button onClick={() => { setEditingBudget(null); setBudgetForm({ title: '', description: '', vendorId: vendors[0]?.id || '', items: [{ id: '1', description: '', quantity: 1, unitPrice: 0 }], status: 'PENDING', documents: [] }); setShowBudgetModal(true); }} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">
-                  Solicitar Orçamento
+                <button onClick={() => { setEditingBudget(null); setBudgetForm({ title: '', description: '', vendorId: vendors[0]?.id || '', items: [{ id: '1', description: '', quantity: 1, unitPrice: 0 }], status: 'PENDING', documents: [] }); setShowBudgetModal(true); }} className="bg-emerald-600 text-white px-5 py-2.5 rounded-md text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                  Nova Cotação
                 </button>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-3">
             {filteredBudgets.map(b => (
-              <div key={b.id} className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 group">
+              <div key={b.id} className="bg-white p-6 rounded-md border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-slate-400 transition-all">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                      b.status === 'PENDING' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                      b.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`px-3 py-1 rounded-sm text-[8px] font-black uppercase tracking-tighter border ${
+                      b.status === 'PENDING' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                      b.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
                     }`}>
-                      {b.status === 'PENDING' ? 'Em Análise' : b.status === 'APPROVED' ? 'Aprovado' : 'Rejeitado'}
+                      {b.status}
                     </span>
-                    <span className="text-[10px] font-black text-slate-400 uppercase">{new Date(b.createdAt).toLocaleDateString()}</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase">{new Date(b.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <h4 className="text-xl font-black text-slate-900 mb-1">{b.title}</h4>
-                  <p className="text-sm text-slate-500 font-medium mb-3">{b.description}</p>
+                  <h4 className="text-lg font-black text-slate-900 leading-tight">{b.title}</h4>
+                  <p className="text-xs text-slate-500 font-medium mb-3 mt-1">{b.description}</p>
                   
-                  {/* Resumo dos Itens */}
-                  <div className="mb-4 bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
-                    {b.items?.map((item, idx) => (
-                      <div key={idx} className="flex justify-between text-[10px] font-bold">
-                        <span className="text-slate-600">{item.quantity}x {item.description}</span>
-                        <span className="text-slate-900">R$ {(item.quantity * item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded bg-blue-50 text-blue-600 flex items-center justify-center text-[10px] font-black">F</div>
-                      <span className="text-xs font-black text-blue-600 uppercase">{vendors.find(v => v.id === b.vendorId)?.name || 'Desconhecido'}</span>
+                  {b.documents && b.documents.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {b.documents.map(doc => (
+                        <a key={doc.id} href={doc.url} download={doc.name} className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-200 rounded-sm text-[9px] font-black text-slate-500 uppercase hover:bg-slate-100 transition-colors">
+                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                           {doc.name}
+                        </a>
+                      ))}
                     </div>
-                    {b.documents && b.documents.length > 0 && (
-                      <a href={b.documents[0].url} download={b.documents[0].name} className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-lg hover:bg-emerald-600 hover:text-white transition-all">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path></svg>
-                        Baixar Orçamento Original
-                      </a>
-                    )}
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-2 py-1 rounded-sm">
+                       Fornecedor: {vendors.find(v => v.id === b.vendorId)?.name || '---'}
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-3 min-w-[180px]">
-                   <p className="text-3xl font-black text-slate-900 tracking-tighter">R$ {b.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <div className="flex flex-col items-end gap-2 min-w-[150px]">
+                   <p className="text-2xl font-black text-slate-900 tracking-tighter leading-none">R$ {b.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                    {canManage && b.status === 'PENDING' && (
                      <div className="flex gap-2">
-                        <button onClick={() => handleQuickStatusUpdate(b, 'APPROVED')} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20">Aprovar</button>
-                        <button onClick={() => handleQuickStatusUpdate(b, 'REJECTED')} className="px-4 py-2 bg-slate-100 text-slate-500 rounded-xl text-[9px] font-black uppercase tracking-widest">Rejeitar</button>
+                        <button onClick={() => handleQuickStatusUpdate(b, 'APPROVED')} className="px-3 py-1.5 bg-emerald-600 text-white rounded-sm text-[9px] font-black uppercase">Aprovar</button>
+                        <button onClick={() => handleQuickStatusUpdate(b, 'REJECTED')} className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-sm text-[9px] font-black uppercase">Recusar</button>
                      </div>
                    )}
                 </div>
               </div>
             ))}
-            {filteredBudgets.length === 0 && (
-              <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-[40px] text-slate-400 font-black uppercase text-xs">Nenhum orçamento encontrado.</div>
-            )}
           </div>
         </div>
       )}
 
       {activeSubTab === 'history' && (
-        <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-sm animate-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-white rounded-md border border-slate-200 overflow-hidden shadow-sm">
            <div className="divide-y divide-slate-100">
               {procurementLogs.map(log => (
-                <div key={log.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div key={log.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-[10px] ${log.action === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                    <div className={`w-8 h-8 rounded-sm flex items-center justify-center font-black text-[9px] ${log.action === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
                       {log.module.charAt(0)}
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-slate-900">{log.userName} <span className="font-medium text-slate-500">realizou</span> {log.action}</p>
-                      <p className="text-[10px] font-black text-blue-600 uppercase mt-0.5">{log.targetName}</p>
+                      <p className="text-xs font-bold text-slate-900">{log.userName} <span className="font-medium text-slate-500">{log.action}</span></p>
+                      <p className="text-[9px] font-black text-blue-600 uppercase">{log.targetName}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase">{new Date(log.timestamp).toLocaleDateString()}</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase">{new Date(log.timestamp).toLocaleDateString()}</span>
                 </div>
               ))}
-              {procurementLogs.length === 0 && <div className="p-20 text-center text-slate-400 font-black uppercase text-xs">Sem registros de auditoria em suprimentos.</div>}
            </div>
         </div>
       )}
 
-      {/* Vendor Modal */}
+      {/* MODAL FORNECEDOR */}
       {showVendorModal && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
-           <div className="bg-white w-full max-w-xl rounded-[40px] p-10 animate-in zoom-in-95 duration-300 shadow-2xl overflow-hidden">
-              <h3 className="text-2xl font-black text-slate-900 mb-6">{editingVendor ? 'Ajustar' : 'Nova'} Empresa</h3>
-              <form onSubmit={handleSaveVendor} className="space-y-4">
-                 <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Empresa (Razão Social)</label>
-                    <input type="text" required placeholder="Ex: Elevadores ABC" className="w-full h-14 px-6 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold outline-none focus:border-blue-500" value={vendorForm.name} onChange={e => setVendorForm({...vendorForm, name: e.target.value})} />
-                 </div>
-                 <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">CNPJ / CPF</label>
-                    <input type="text" placeholder="00.000.000/0001-00" className="w-full h-14 px-6 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold outline-none focus:border-blue-500" value={vendorForm.taxId} onChange={e => setVendorForm({...vendorForm, taxId: e.target.value})} />
-                 </div>
-                 <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Contato (Telefone)</label>
-                    <input type="tel" placeholder="(00) 00000-0000" className="w-full h-14 px-6 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold outline-none focus:border-blue-500" value={vendorForm.phone} onChange={e => setVendorForm({...vendorForm, phone: e.target.value})} />
-                 </div>
-                 <div className="space-y-1">
-                    <div className="flex items-center justify-between px-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Especialidade</label>
-                       {canManage && (
-                         <button type="button" onClick={() => setShowCategoryManager(true)} className="text-[9px] font-black text-blue-600 uppercase hover:underline">Gerenciar</button>
-                       )}
-                    </div>
-                    <select className="w-full h-14 px-6 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold outline-none" value={vendorForm.category} onChange={e => setVendorForm({...vendorForm, category: e.target.value})}>
-                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                 </div>
-                 <div className="flex gap-4 pt-4">
-                    <button type="button" onClick={() => setShowVendorModal(false)} className="flex-1 h-14 font-black uppercase text-xs text-slate-400">Cancelar</button>
-                    <button type="submit" className="flex-1 h-14 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg shadow-blue-500/20 active:scale-95 transition-all">Salvar Cadastro</button>
-                 </div>
-              </form>
-           </div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg rounded-md shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="px-8 py-5 border-b flex items-center justify-between bg-slate-50">
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Cadastro de Fornecedor</h3>
+              <button onClick={() => setShowVendorModal(false)} className="p-1 text-slate-400 hover:text-slate-900"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <form onSubmit={handleSaveVendor} className="p-8 space-y-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Empresa</label>
+                <input type="text" required className="w-full h-11 px-4 rounded-sm border border-slate-200 font-bold bg-slate-50 text-sm focus:border-blue-500 outline-none" value={vendorForm.name} onChange={e => setVendorForm({...vendorForm, name: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1">CNPJ/CPF</label>
+                  <input type="text" required className="w-full h-11 px-4 rounded-sm border border-slate-200 font-bold bg-slate-50 text-sm focus:border-blue-500 outline-none" value={vendorForm.taxId} onChange={e => setVendorForm({...vendorForm, taxId: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Telefone</label>
+                  <input type="tel" required className="w-full h-11 px-4 rounded-sm border border-slate-200 font-bold bg-slate-50 text-sm focus:border-blue-500 outline-none" value={vendorForm.phone} onChange={e => setVendorForm({...vendorForm, phone: e.target.value})} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Especialidade</label>
+                  <button type="button" onClick={() => setShowCategoryManager(true)} className="text-[9px] font-black text-blue-600 uppercase hover:underline">Gerenciar</button>
+                </div>
+                <select className="w-full h-11 px-4 rounded-sm border border-slate-200 font-bold bg-slate-50 text-sm outline-none cursor-pointer" value={vendorForm.category} onChange={e => setVendorForm({...vendorForm, category: e.target.value})}>
+                   {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setShowVendorModal(false)} className="flex-1 py-3 text-[10px] font-black uppercase border border-slate-200 rounded-sm hover:bg-slate-50 transition-all">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 text-[10px] font-black uppercase bg-slate-900 text-white rounded-sm shadow-lg active:scale-95 transition-all">Salvar Fornecedor</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
-      {/* Budget Modal - MÚLTIPLOS ITENS + ANEXO */}
+      {/* MODAL ORÇAMENTO */}
       {showBudgetModal && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md overflow-y-auto">
-           <div className="bg-white w-full max-w-2xl rounded-[40px] p-10 animate-in zoom-in-95 duration-300 shadow-2xl my-8">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Solicitar Cotação Detalhada</h3>
-                <div className="text-right">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Estimado</p>
-                   <p className="text-2xl font-black text-emerald-600 tracking-tighter">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-2xl rounded-md shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+            <div className="px-8 py-5 border-b flex items-center justify-between bg-slate-50">
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Novo Registro de Orçamento</h3>
+              <button onClick={() => setShowBudgetModal(false)} className="p-1 text-slate-400 hover:text-slate-900"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <form onSubmit={handleSaveBudget} className="p-8 space-y-5 overflow-y-auto scrollbar-hide">
+              <input type="text" placeholder="Título do Serviço (ex: Pintura fachada)" required className="w-full h-11 px-4 rounded-sm border border-slate-200 font-bold bg-slate-50 text-sm focus:border-blue-500 outline-none" value={budgetForm.title} onChange={e => setBudgetForm({...budgetForm, title: e.target.value})} />
+              <textarea placeholder="Observações..." className="w-full p-4 rounded-sm border border-slate-200 font-medium bg-slate-50 text-sm focus:border-blue-500 outline-none" rows={2} value={budgetForm.description} onChange={e => setBudgetForm({...budgetForm, description: e.target.value})} />
+              
+              <div className="space-y-2">
+                <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Fornecedor Vinculado</label>
+                <select required className="w-full h-11 px-4 rounded-sm border border-slate-200 font-bold bg-slate-50 text-sm outline-none" value={budgetForm.vendorId} onChange={e => setBudgetForm({...budgetForm, vendorId: e.target.value})}>
+                  <option value="">Selecione uma empresa...</option>
+                  {vendors.map(v => <option key={v.id} value={v.id}>{v.name} ({v.category})</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Itens da Cotação</label>
+                  <button type="button" onClick={handleAddBudgetItem} className="text-[9px] font-black text-blue-600 uppercase">+ Add Item</button>
+                </div>
+                <div className="space-y-2">
+                  {budgetForm.items.map(item => (
+                    <div key={item.id} className="flex gap-2 items-center">
+                      <input type="text" placeholder="Item" className="flex-1 h-10 px-3 rounded-sm border bg-slate-50 text-xs font-bold" value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} />
+                      <input type="number" placeholder="Qtde" className="w-16 h-10 px-3 rounded-sm border bg-slate-50 text-xs font-bold" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', parseInt(e.target.value))} />
+                      <input type="number" step="0.01" placeholder="Preço" className="w-24 h-10 px-3 rounded-sm border bg-slate-50 text-xs font-bold" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', parseFloat(e.target.value))} />
+                      <button type="button" onClick={() => handleRemoveBudgetItem(item.id)} className="text-red-400 p-1">×</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-right pt-2">
+                  <span className="text-xs font-black uppercase text-slate-400 mr-3">Valor Total:</span>
+                  <span className="text-xl font-black text-slate-900">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
 
-              <form onSubmit={handleSaveBudget} className="space-y-8">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Título</label>
-                        <input type="text" required placeholder="Título do Serviço" className="w-full h-14 px-6 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold outline-none" value={budgetForm.title} onChange={e => setBudgetForm({...budgetForm, title: e.target.value})} />
+              {/* ANEXOS ORÇAMENTO */}
+              <div className="space-y-2">
+                <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Documentos & Propostas</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {budgetForm.documents.map(doc => (
+                    <div key={doc.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-sm border border-slate-200 text-[10px] font-bold text-slate-700">
+                      <span className="truncate max-w-[150px]">{doc.name}</span>
+                      <button type="button" onClick={() => removeBudgetAttachment(doc.id)} className="text-red-500 hover:text-red-700 transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                      </button>
                     </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Fornecedor</label>
-                        <select required className="w-full h-14 px-6 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold outline-none" value={budgetForm.vendorId} onChange={e => setBudgetForm({...budgetForm, vendorId: e.target.value})}>
-                            <option value="">Selecionar Fornecedor</option>
-                            {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                        </select>
-                    </div>
-                 </div>
+                  ))}
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => budgetFileRef.current?.click()}
+                  className="w-full h-11 border-2 border-dashed border-slate-200 rounded-sm flex items-center justify-center gap-2 text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-all bg-slate-50"
+                >
+                   {isUploading ? (
+                     <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                   ) : (
+                     <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                        <span className="text-[10px] font-black uppercase">Anexar Arquivo (PDF, Imagem, Doc)</span>
+                     </>
+                   )}
+                </button>
+                <input type="file" ref={budgetFileRef} className="hidden" onChange={handleBudgetFileChange} />
+              </div>
 
-                 <div className="space-y-4">
-                    <div className="flex items-center justify-between px-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Itens do Orçamento</label>
-                       <button type="button" onClick={handleAddBudgetItem} className="text-[9px] font-black text-emerald-600 uppercase hover:underline">+ Adicionar Item</button>
-                    </div>
-                    
-                    <div className="space-y-3 max-h-[30vh] overflow-y-auto pr-2 scrollbar-hide">
-                        {budgetForm.items.map((item, idx) => (
-                          <div key={item.id} className="flex gap-2 animate-in slide-in-from-top-2 duration-300">
-                             <input 
-                                type="text" 
-                                placeholder="Descrição do item..." 
-                                required
-                                className="flex-1 h-12 px-4 rounded-xl border-2 border-slate-100 bg-white font-bold text-xs"
-                                value={item.description}
-                                onChange={e => handleItemChange(item.id, 'description', e.target.value)}
-                             />
-                             <input 
-                                type="number" 
-                                placeholder="Qtd" 
-                                required
-                                min="1"
-                                className="w-20 h-12 px-2 rounded-xl border-2 border-slate-100 bg-white font-bold text-xs text-center"
-                                value={item.quantity}
-                                onChange={e => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)}
-                             />
-                             <input 
-                                type="number" 
-                                placeholder="Preço" 
-                                step="0.01"
-                                required
-                                className="w-28 h-12 px-2 rounded-xl border-2 border-slate-100 bg-white font-bold text-xs text-center"
-                                value={item.unitPrice || ''}
-                                onChange={e => handleItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                             />
-                             <button 
-                                type="button" 
-                                onClick={() => handleRemoveBudgetItem(item.id)}
-                                className="w-12 h-12 flex items-center justify-center bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"
-                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg>
-                             </button>
-                          </div>
-                        ))}
-                    </div>
-                 </div>
-
-                 <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Arquivo de Orçamento do Fornecedor (Opcional)</label>
-                    <div className="flex items-center gap-4">
-                        <button type="button" onClick={() => budgetFileRef.current?.click()} className="flex items-center gap-2 px-6 py-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-500 hover:border-blue-500 hover:text-blue-600 transition-all">
-                            {isUploading ? 'Processando...' : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg> Selecionar Arquivo</>}
-                        </button>
-                        <input type="file" ref={budgetFileRef} className="hidden" onChange={handleBudgetFileUpload} />
-                        {budgetForm.documents.length > 0 && (
-                          <div className="flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-3 rounded-xl border border-blue-100">
-                             <span className="text-[10px] font-black uppercase truncate max-w-[150px]">{budgetForm.documents[0].name}</span>
-                             <button type="button" onClick={() => setBudgetForm(prev => ({...prev, documents: []}))} className="text-red-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-                          </div>
-                        )}
-                    </div>
-                 </div>
-
-                 <textarea rows={2} placeholder="Observações técnicas gerais..." className="w-full p-6 rounded-2xl border-2 border-slate-100 bg-slate-50 font-medium outline-none" value={budgetForm.description} onChange={e => setBudgetForm({...budgetForm, description: e.target.value})} />
-
-                 <div className="flex gap-4 pt-4">
-                    <button type="button" onClick={() => setShowBudgetModal(false)} className="flex-1 h-14 font-black uppercase text-xs text-slate-400">Cancelar</button>
-                    <button type="submit" className="flex-1 h-14 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">Salvar Cotação</button>
-                 </div>
-              </form>
-           </div>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setShowBudgetModal(false)} className="flex-1 py-3 text-[10px] font-black uppercase border border-slate-200 rounded-sm">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 text-[10px] font-black uppercase bg-blue-600 text-white rounded-sm shadow-lg active:scale-95 transition-all">Confirmar Processo</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
+      {/* MODAL GERENCIADOR DE ESPECIALIDADES */}
       {showCategoryManager && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-xl">
-          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-xl font-black text-slate-900">Especialidades</h3>
-              <button onClick={() => setShowCategoryManager(false)} className="p-2 text-slate-400"><Icons.Add className="rotate-45" /></button>
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-md rounded-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Especialidades</h3>
+              <button onClick={() => setShowCategoryManager(false)} className="p-1 text-slate-400 hover:text-slate-900"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div className="p-8 space-y-6">
-              <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 scrollbar-hide">
+              <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 scrollbar-hide">
                 {categories.map(cat => (
-                  <div key={cat} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <span className="font-bold text-slate-700">{cat}</span>
-                    <button onClick={() => handleDeleteCategory(cat)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Icons.Add className="rotate-45 w-4 h-4" /></button>
+                  <div key={cat} className="flex items-center justify-between p-4 bg-white rounded-sm border border-slate-100 group hover:border-blue-300 transition-all">
+                    {editingCategory?.old === cat ? (
+                      <div className="flex-1 flex gap-2">
+                        <input type="text" className="flex-1 px-3 py-1 border border-blue-500 rounded-sm text-sm font-bold bg-white" value={editingCategory.new} onChange={e => setEditingCategory({...editingCategory, new: e.target.value})} />
+                        <button onClick={handleUpdateCategory} className="text-emerald-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg></button>
+                        <button onClick={() => setEditingCategory(null)} className="text-slate-400">×</button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="font-bold text-slate-700 text-sm">{cat}</span>
+                        <div className="flex gap-2">
+                          <button onClick={() => setEditingCategory({ old: cat, new: cat })} className="p-1.5 text-slate-400 hover:text-blue-600 transition-all">
+                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                          </button>
+                          <button onClick={() => handleDeleteCategory(cat)} className="p-1.5 text-slate-400 hover:text-red-600 transition-all">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
-              <div className="flex gap-2">
-                <input type="text" placeholder="Nova..." className="flex-1 h-12 px-4 rounded-xl border-2 border-slate-100 font-bold bg-slate-50 outline-none" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
-                <button onClick={handleAddCategory} className="bg-blue-600 text-white w-12 h-12 rounded-xl flex items-center justify-center"><Icons.Add /></button>
+              <div className="bg-slate-50 p-6 rounded-md border border-slate-200">
+                <label className="text-[9px] font-black uppercase text-slate-400 ml-1 mb-2 block">Nova Especialidade</label>
+                <div className="flex gap-2">
+                  <input type="text" placeholder="Ex: Hidráulica" className="flex-1 h-11 px-4 rounded-sm border border-slate-200 font-bold bg-white text-sm outline-none focus:border-blue-500 shadow-sm" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
+                  <button onClick={handleAddCategory} className="bg-slate-900 text-white w-11 h-11 rounded-sm flex items-center justify-center shrink-0 shadow-lg active:scale-95 transition-all">
+                    <Icons.Add />
+                  </button>
+                </div>
               </div>
-              <button onClick={() => setShowCategoryManager(false)} className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl text-xs uppercase tracking-widest">Fechar</button>
+              <button onClick={() => setShowCategoryManager(false)} className="w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-slate-900">Fechar</button>
             </div>
           </div>
         </div>
